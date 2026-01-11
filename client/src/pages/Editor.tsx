@@ -28,6 +28,10 @@ const Editor = () => {
         addBlock(afterId, type);
     };
 
+    const handleAddBlock = (afterId: string | null, type: any = 'p') => {
+        addBlock(afterId, type);
+    };
+
     return (
         <div className="flex flex-col h-screen bg-white">
             <header className="flex items-center justify-between px-8 py-4 border-b border-gray-100 bg-white shadow-sm z-10">
