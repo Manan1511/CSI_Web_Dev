@@ -1,7 +1,7 @@
 export interface Block {
     id: string;
     content: string;
-    type: 'p' | 'h1' | 'h2' | 'ul';
+    type: 'p' | 'h1' | 'h2' | 'h3' | 'ul';
     rank: string;
 }
 

@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import type { Block as BlockType } from '../types';
-import { Trash2 } from 'lucide-react';
+import { Trash2, GripVertical } from 'lucide-react';
 
 interface BlockProps {
     block: BlockType;
@@ -42,7 +42,23 @@ const Block: React.FC<BlockProps> = ({ block, updateBlock, addBlock, deleteBlock
     }, [block.content]);
 
     return (
-        <div className="group relative mb-4 flex items-start w-full">
+        <div className="group relative flex items-start -ml-12 pl-12">
+            {/* Hover Menu / Drag Handle (Left Gutter) */}
+            <div className="absolute left-0 top-1.5 opacity-0 group-hover:opacity-100 flex items-center transition-opacity pr-2">
+                <div className="flex items-center gap-0.5" title="Drag to move">
+                    <button
+                        onClick={() => deleteBlock(block.id)}
+                        className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                        title="Delete"
+                    >
+                        <Trash2 size={14} />
+                    </button>
+                    <div className="cursor-grab p-1 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors">
+                        <GripVertical size={14} />
+                    </div>
+                </div>
+            </div>
+
             <textarea
                 ref={textareaRef}
                 value={block.content}
@@ -52,25 +68,16 @@ const Block: React.FC<BlockProps> = ({ block, updateBlock, addBlock, deleteBlock
                 }}
                 onKeyDown={handleKeyDown}
                 onFocus={() => onFocus(block.id)}
-                placeholder={block.type === 'h1' ? "Untitled" : "Click here to start typing"}
-                className={`flex-1 resize-none outline-none bg-transparent overflow-hidden px-4 py-3 rounded hover:bg-gray-50 transition-colors ${block.type === 'h1' ? 'text-4xl font-bold mb-4 placeholder-gray-300 min-h-[3rem]' :
-                    block.type === 'h2' ? 'text-2xl font-bold mb-2 placeholder-gray-300 min-h-[2.5rem]' :
-                        block.type === 'ul' ? 'list-disc ml-4' :
-                            'text-lg leading-relaxed text-gray-800 min-h-[6rem]' /* Increased default height/size */
+                placeholder={block.type === 'h1' ? "Untitled" : "Click here to type"}
+                className={`w-full resize-none outline-none bg-transparent overflow-hidden py-1 rounded-sm selection:bg-brand-100 selection:text-brand-900 ${block.type === 'h1' ? 'text-4xl font-bold mb-4 placeholder-slate-200 text-slate-900 min-h-[3.5rem] leading-tight' :
+                    block.type === 'h2' ? 'text-2xl font-semibold mb-3 placeholder-slate-200 text-slate-800 min-h-[2.5rem] mt-6' :
+                        block.type === 'h3' ? 'text-xl font-semibold mb-2 placeholder-slate-200 text-slate-800 min-h-[2rem] mt-4' :
+                            block.type === 'ul' ? 'text-base leading-relaxed text-slate-700 ml-6 list-disc' :
+                                // Default paragraph
+                                'text-base leading-7 text-slate-700 min-h-[1.75rem] mb-1'
                     }`}
                 rows={1}
             />
-
-            {/* Delete Button - Moved to the right */}
-            <div className="ml-2 mt-3 opacity-0 group-hover:opacity-100 flex items-center transition-opacity flex-shrink-0">
-                <button
-                    onClick={() => deleteBlock(block.id)}
-                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
-                    title="Delete block"
-                >
-                    <Trash2 size={18} />
-                </button>
-            </div>
         </div>
     );
 };

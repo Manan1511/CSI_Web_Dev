@@ -4,14 +4,20 @@ import { AuthRequest } from '../middleware/auth';
 
 export const createDocument = async (req: AuthRequest, res: Response) => {
     const userId = req.user?.id;
+    console.log('[CreateDocument] Request received. User ID:', userId);
     try {
+        if (!userId) {
+            console.error('[CreateDocument] No User ID found in request');
+            return res.status(401).json({ message: 'Unauthorized: No User ID' });
+        }
         const newDoc = await pool.query(
             'INSERT INTO documents (owner_id) VALUES ($1) RETURNING *',
             [userId]
         );
+        console.log('[CreateDocument] Document created:', newDoc.rows[0]);
         res.status(201).json(newDoc.rows[0]);
     } catch (err) {
-        console.error(err);
+        console.error('[CreateDocument] Error:', err);
         res.status(500).json({ message: 'Server error' });
     }
 };
