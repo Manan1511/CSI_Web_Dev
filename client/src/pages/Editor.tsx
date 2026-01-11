@@ -28,9 +28,7 @@ const Editor = () => {
         addBlock(afterId, type);
     };
 
-    const handleAddBlock = (afterId: string | null, type: any = 'p') => {
-        addBlock(afterId, type);
-    };
+
 
     return (
         <div className="flex flex-col h-screen bg-white">
