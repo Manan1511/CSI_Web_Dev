@@ -1,18 +1,28 @@
 import React, { useRef, useEffect } from 'react';
 import type { Block as BlockType } from '../types';
 import { Trash2, GripVertical } from 'lucide-react';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface BlockProps {
     block: BlockType;
     updateBlock: (id: string, content: string) => void;
     addBlock: (afterId: string, type: BlockType['type']) => void;
     deleteBlock: (id: string) => void;
+    moveBlock: (id: string, direction: 'up' | 'down') => void;
     isFocused: boolean;
     onFocus: (id: string) => void;
 }
 
 const Block: React.FC<BlockProps> = ({ block, updateBlock, addBlock, deleteBlock, isFocused, onFocus }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+    };
 
     useEffect(() => {
         if (isFocused && textareaRef.current) {
@@ -22,8 +32,8 @@ const Block: React.FC<BlockProps> = ({ block, updateBlock, addBlock, deleteBlock
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            addBlock(block.id, 'p');
+            // Default behavior (new line) in the same block
+            return;
         } else if (e.key === 'Backspace' && block.content === '') {
             e.preventDefault();
             deleteBlock(block.id);
@@ -42,18 +52,29 @@ const Block: React.FC<BlockProps> = ({ block, updateBlock, addBlock, deleteBlock
     }, [block.content]);
 
     return (
-        <div className="group relative flex items-start -ml-12 pl-12">
+        <div
+            ref={setNodeRef}
+            style={style}
+            className="group relative flex items-start -ml-12 pl-12"
+        >
             {/* Hover Menu / Drag Handle (Left Gutter) */}
-            <div className="absolute left-0 top-1.5 opacity-0 group-hover:opacity-100 flex items-center transition-opacity pr-2">
-                <div className="flex items-center gap-0.5" title="Drag to move">
+            <div className="absolute left-0 top-1.5 opacity-0 group-hover:opacity-100 flex items-center transition-opacity pr-2 z-10">
+                <div className="flex items-center gap-0.5">
                     <button
-                        onClick={() => deleteBlock(block.id)}
+                        onClick={(e) => {
+                            e.stopPropagation(); // Fix deletion issue
+                            deleteBlock(block.id);
+                        }}
                         className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                         title="Delete"
                     >
                         <Trash2 size={14} />
                     </button>
-                    <div className="cursor-grab p-1 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors">
+                    <div
+                        className="cursor-move p-1 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors"
+                        {...attributes}
+                        {...listeners}
+                    >
                         <GripVertical size={14} />
                     </div>
                 </div>

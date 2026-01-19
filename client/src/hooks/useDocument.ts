@@ -34,6 +34,7 @@ const generateRank = (prev: string | null, next: string | null): string => {
 export const useDocument = (docId: string) => {
     const [blocks, setBlocks] = useState<Block[]>([]);
     const [title, setTitle] = useState('Untitled');
+    const [headerNote, setHeaderNote] = useState('');
     const [isConnected, setIsConnected] = useState(false);
     const socketRef = useRef<WebSocket | null>(null);
     const { token } = useAuth();
@@ -42,7 +43,10 @@ export const useDocument = (docId: string) => {
         // 1. Fetch initial state (including doc metadata for title)
         fetch(`${API_URL}/documents/${docId}`, { headers: getAuthHeader() })
             .then(res => res.json())
-            .then(data => setTitle(data.title))
+            .then(data => {
+                setTitle(data.title);
+                setHeaderNote(data.header_note || '');
+            })
             .catch(console.error);
 
         fetch(`${API_URL}/documents/${docId}/blocks`, { headers: getAuthHeader() })
@@ -133,5 +137,57 @@ export const useDocument = (docId: string) => {
         broadcastOp({ type: 'DELETE', blockId: id });
     };
 
-    return { blocks, title, setTitle, isConnected, addBlock, updateBlock, deleteBlock };
+    const moveBlock = (id: string, direction: 'up' | 'down') => {
+        const index = blocks.findIndex(b => b.id === id);
+        if (index === -1) return;
+
+        let newRank;
+        if (direction === 'up') {
+            if (index === 0) return; // Already at top
+            const prevBlock = index - 1 > 0 ? blocks[index - 2] : null;
+            const nextBlock = blocks[index - 1]; // The block we are jumping over
+            newRank = generateRank(prevBlock?.rank || null, nextBlock.rank);
+        } else {
+            if (index === blocks.length - 1) return; // Already at bottom
+            const prevBlock = blocks[index + 1]; // The block we are jumping over
+            const nextBlock = index + 2 < blocks.length ? blocks[index + 2] : null;
+            newRank = generateRank(prevBlock.rank, nextBlock?.rank || null);
+        }
+
+        // Optimistic update
+        setBlocks(prev => {
+            const next = prev.map(b => b.id === id ? { ...b, rank: newRank } : b);
+            return next.sort((a, b) => a.rank.localeCompare(b.rank));
+        });
+
+        broadcastOp({ type: 'UPDATE', blockId: id, data: { rank: newRank } });
+    };
+
+    const reorderBlocks = (activeId: string, overId: string) => {
+        setBlocks(prev => {
+            const oldIndex = prev.findIndex(b => b.id === activeId);
+            const newIndex = prev.findIndex(b => b.id === overId);
+
+            if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return prev;
+
+            const newBlocks = [...prev];
+            const [movedBlock] = newBlocks.splice(oldIndex, 1);
+            newBlocks.splice(newIndex, 0, movedBlock);
+
+            // Calculate new rank
+            const prevBlock = newBlocks[newIndex - 1];
+            const nextBlock = newBlocks[newIndex + 1];
+            const newRank = generateRank(prevBlock?.rank || null, nextBlock?.rank || null);
+
+            // Update the moved block's rank
+            newBlocks[newIndex] = { ...movedBlock, rank: newRank };
+
+            // Broadcast the change
+            broadcastOp({ type: 'UPDATE', blockId: activeId, data: { rank: newRank } });
+
+            return newBlocks;
+        });
+    };
+
+    return { blocks, title, setTitle, headerNote, setHeaderNote, isConnected, addBlock, updateBlock, deleteBlock, moveBlock, reorderBlocks };
 };

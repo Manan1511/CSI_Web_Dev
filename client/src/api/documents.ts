@@ -36,11 +36,12 @@ export const deleteDocument = async (id: string) => {
     return response.json();
 };
 
-export const updateDocument = async (id: string, title: string) => {
+export const updateDocument = async (id: string, updates: string | { title?: string; header_note?: string }) => {
+    const body = typeof updates === 'string' ? { title: updates } : updates;
     const response = await fetch(`${API_URL}/documents/${id}`, {
         method: 'PUT',
         headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title }),
+        body: JSON.stringify(body),
     });
     if (!response.ok) throw new Error('Failed to update document');
     return response.json();

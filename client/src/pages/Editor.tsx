@@ -3,26 +3,53 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useDocument } from '../hooks/useDocument';
 import Block from '../components/Block';
 import { updateDocument, deleteDocument } from '../api/documents';
-import { ChevronLeft, MoreHorizontal, Cloud, CloudOff, Trash2, Edit2 } from 'lucide-react';
+import { ChevronLeft, MoreHorizontal, Cloud, CloudOff, Trash2, Edit2, FileText } from 'lucide-react';
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 
 const Editor = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { blocks, title, setTitle, isConnected, addBlock, updateBlock, deleteBlock } = useDocument(id!);
+    const { blocks, title, setTitle, headerNote, setHeaderNote, isConnected, addBlock, updateBlock, deleteBlock, moveBlock, reorderBlocks } = useDocument(id!);
     const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isHeaderNoteVisible, setIsHeaderNoteVisible] = useState(false);
     const titleInputRef = useRef<HTMLInputElement>(null);
 
-    const handleDelete = async () => {
-        if (!id) return;
-        if (!confirm('Are you sure you want to delete this document? This cannot be undone.')) return;
-        try {
-            await deleteDocument(id);
-            navigate('/');
-        } catch (err) {
-            console.error(err);
-            alert('Failed to delete document');
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 5, // minimum shift to activate drag, prevents accidental drags on clicks
+            },
+        })
+    );
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+
+        if (active.id !== over?.id) {
+            reorderBlocks(active.id as string, over?.id as string);
         }
+    };
+
+    const handleDelete = async (e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        setIsMenuOpen(false);
+
+        if (!id) return;
+
+        // Allow UI to update before blocking with confirm
+        setTimeout(async () => {
+            if (window.confirm('Are you sure you want to delete this document? This cannot be undone.')) {
+                try {
+                    await deleteDocument(id);
+                    navigate('/');
+                } catch (err) {
+                    console.error(err);
+                    alert('Failed to delete document');
+                }
+            }
+        }, 10);
     };
 
     const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -33,7 +60,20 @@ const Editor = () => {
 
     const debouncedUpdateTitle = useCallback((newTitle: string) => {
         const timeoutId = setTimeout(() => {
-            updateDocument(id!, newTitle).catch(console.error);
+            updateDocument(id!, { title: newTitle }).catch(console.error);
+        }, 500);
+        return () => clearTimeout(timeoutId);
+    }, [id]);
+
+    const handleHeaderNoteChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const newNote = e.target.value;
+        setHeaderNote(newNote);
+        debouncedUpdateHeaderNote(newNote);
+    };
+
+    const debouncedUpdateHeaderNote = useCallback((newNote: string) => {
+        const timeoutId = setTimeout(() => {
+            updateDocument(id!, { header_note: newNote }).catch(console.error);
         }, 500);
         return () => clearTimeout(timeoutId);
     }, [id]);
@@ -67,6 +107,15 @@ const Editor = () => {
                     </div>
 
                     <div className="flex items-center gap-4">
+                        {/* Header Note Toggle */}
+                        <button
+                            onClick={() => setIsHeaderNoteVisible(!isHeaderNoteVisible)}
+                            className={`p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors ${isHeaderNoteVisible || headerNote ? 'text-brand-600 bg-brand-50' : ''}`}
+                            title="Header Note"
+                        >
+                            <FileText size={20} />
+                        </button>
+
                         <div className="flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full bg-slate-50 border border-slate-100">
                             {isConnected ? (
                                 <>
@@ -129,20 +178,48 @@ const Editor = () => {
                 }
             }}>
                 <div className="max-w-3xl mx-auto px-8 py-16 min-h-[calc(100vh-3.5rem)] flex flex-col">
-                    {/* Title (Big H1 feel for the document start) */}
-                    {/* Note: We could put the title input here for a true Notion feel, but keeping it in header for now as updated in previous steps */}
+                    {/* Header Note - Repositioned below main title area but before blocks */}
+                    {(isHeaderNoteVisible || headerNote) && (
+                        <div className="mb-8 ml-12 animate-fade-in group relative">
+                            <textarea
+                                value={headerNote}
+                                onChange={handleHeaderNoteChange}
+                                placeholder="Add a description..."
+                                className="w-full resize-none outline-none bg-transparent text-slate-500 text-base italic p-0 border-none focus:ring-0 placeholder:text-slate-300"
+                                rows={1}
+                                style={{ height: 'auto', minHeight: '1.5rem' }}
+                                onInput={(e) => {
+                                    const target = e.target as HTMLTextAreaElement;
+                                    target.style.height = 'auto';
+                                    target.style.height = target.scrollHeight + 'px';
+                                }}
+                            />
+                        </div>
+                    )}
 
-                    {blocks.map(block => (
-                        <Block
-                            key={block.id}
-                            block={block}
-                            updateBlock={updateBlock}
-                            addBlock={handleAddBlock}
-                            deleteBlock={deleteBlock}
-                            isFocused={focusedBlockId === block.id}
-                            onFocus={setFocusedBlockId}
-                        />
-                    ))}
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleDragEnd}
+                    >
+                        <SortableContext
+                            items={blocks.map(b => b.id)}
+                            strategy={verticalListSortingStrategy}
+                        >
+                            {blocks.map(block => (
+                                <Block
+                                    key={block.id}
+                                    block={block}
+                                    updateBlock={updateBlock}
+                                    addBlock={handleAddBlock}
+                                    deleteBlock={deleteBlock}
+                                    moveBlock={moveBlock}
+                                    isFocused={focusedBlockId === block.id}
+                                    onFocus={setFocusedBlockId}
+                                />
+                            ))}
+                        </SortableContext>
+                    </DndContext>
 
                     <div className="mt-4 flex justify-center pb-32">
                         <button

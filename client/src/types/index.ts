@@ -10,5 +10,6 @@ export type BlockType = Block['type'];
 export interface DocState {
     blocks: Block[];
     title: string;
+    header_note?: string;
     version: number;
 }

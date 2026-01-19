@@ -69,12 +69,12 @@ export const deleteDocument = async (req: AuthRequest, res: Response) => {
 
 export const updateDocument = async (req: AuthRequest, res: Response) => {
     const { id } = req.params;
-    const { title } = req.body;
+    const { title, header_note } = req.body;
     const userId = req.user?.id;
     try {
         const result = await pool.query(
-            'UPDATE documents SET title = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND owner_id = $3 RETURNING *',
-            [title, id, userId]
+            'UPDATE documents SET title = COALESCE($1, title), header_note = COALESCE($2, header_note), updated_at = CURRENT_TIMESTAMP WHERE id = $3 AND owner_id = $4 RETURNING *',
+            [title, header_note, id, userId]
         );
         if (result.rows.length === 0) return res.status(404).json({ message: 'Document not found or unauthorized' });
         res.json(result.rows[0]);

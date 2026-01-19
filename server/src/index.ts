@@ -69,11 +69,17 @@ wss.on('connection', async (ws, req) => {
                             [id, docId, content, type, rank]
                         );
                     } else if (op.type === 'UPDATE') {
-                        const { content } = op.data;
-                        await pool.query(
-                            'UPDATE blocks SET content = $1 WHERE id = $2',
-                            [content, op.blockId]
-                        );
+                        const { id, ...data } = op.data; // Expecting { id: string, content?: string, rank?: string, ... }
+                        // Construct dynamic update query
+                        const keys = Object.keys(data);
+                        if (keys.length > 0) {
+                            const setClause = keys.map((key, idx) => `${key} = $${idx + 1}`).join(', ');
+                            const values = keys.map(key => data[key]);
+                            await pool.query(
+                                `UPDATE blocks SET ${setClause} WHERE id = $${keys.length + 1}`,
+                                [...values, op.blockId]
+                            );
+                        }
                     } else if (op.type === 'DELETE') {
                         await pool.query('DELETE FROM blocks WHERE id = $1', [op.blockId]);
                     }
